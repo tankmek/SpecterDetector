@@ -16,33 +16,33 @@ Path to the token file on the staging machine
 Hashtable of computer hostnames as keys and an array of destination paths
 #>
     # validate local file exists
-    Write-Host '[-] Checking local file'
+    Write-Host '[-] Validating local token'
     if (! (Test-Path -Path $token_file)){
         Write-Host "[-] Error: $token_file not found!"
         return $false
     }
-    $session = ""
+    
     foreach ($computer in $endpoint.keys){
-        Write-Host "[-] Accessing $computer" -ForegroundColor Green
+        Write-Host "[-] Connecting to remote host: $computer" -ForegroundColor Green
         $session = (New-PSSession -ComputerName $computer -Credential $auth)
         foreach ($dest_file in $endpoint.$computer){
             $dest_path = Split-Path -Path $dest_file
             # check if remote file already exits
-            Write-Host '[-] Checking remote file'
+            #Write-Host '[-] Checking remote file'
             if (! (Invoke-Command -ScriptBlock {
                  Test-Path -Path $using:dest_file } -Session $session)){
-                Write-Host "[-] Remote file: $dest_file not present"
-                Write-Host "[-] Checking path(s)"
+                #Write-Host "[-] Remote file: $dest_file not present"
+                #Write-Host "[-] Checking path(s)"
                 #TODO: Add prompt if path does not exist
                 if (! (Invoke-Command -ScriptBlock {
                      Test-Path -Path $using:dest_path } -Session $session)){
-                    Write-Host "[-] Creating remote file path"
+                 #   Write-Host "[-] Creating remote file path"
                     Invoke-Command -Command {
                          New-Item -ItemType Directory $using:dest_path
                     } -Session $session
                 }
                 # Copy token to destination
-                Write-Host '[-] Copying token to destination'
+                Write-Host '[-] Dropping token:', $dest_file
                 Copy-Item -Path $token_file -Destination $dest_file -ToSession $session
                 # Set Audit ACL 
                 Write-Host '[-] Setting Audit ACL'
@@ -102,7 +102,38 @@ Path to the honey token on the remote system
     } -Session $session
 }
 
+
+function removeToken([hashtable]$remote_hosts){
+    
+    # TODO: add -Force if user wants to do this after a warning
+    foreach ($computer in $remote_hosts.keys){
+        Write-Host "[-] Connecting to remote host: $computer" -ForegroundColor Green
+        $session = (New-PSSession -ComputerName $computer -Credential $auth)
+        foreach ($dest_file in $remote_hosts.$computer){
+            $dest_path = Split-Path -Path $dest_file
+            # check if remote file is a directory
+            #Write-Host '[-] Checking remote file'
+            if (! (Invoke-Command -ScriptBlock {
+                   Test-Path -Path $using:dest_file } -Session $session)){
+                Write-Host '[-] Remote token not found', $dest_file
+                break
+            # Does not remove directories by default        
+            } elseif ((Invoke-Command -ScriptBlock {
+                         Test-Path -Path $using:dest_file -PathType Container} -Session $session)) {
+                Write-Host '[-] Warning: skipping directory token'
+                break
+            }
+            # If we get here rm file
+            Write-Host '[-] Removing token'
+            Invoke-Command -ScriptBlock { Remove-Item -Path $using:dest_file } -Session $session
+
+        }
+        Remove-PSSession $session
+    }
+}
+
 Clear-Host
+
 $banner = @'
   __          __                   __                   
  |  |_.-----.|  |--.-----.-----.--|  |.----.-----.-----.
@@ -115,6 +146,7 @@ $banner = @'
 '@
 
 $banner
+# TODO: Add try/catch
 $auth = Get-Credential
 # $assets = @{}
 $jump_box = @{}
@@ -135,6 +167,7 @@ $jump_box.winblue2 += 'c:\admin_tools\keepass\servers.kdbx'
 # Destination for winblue3
 $file_server.winblue3 += 'c:\backups\brocade_cfgs.zip'
 
+# TODO: add option to read these from file
 # List of tokens to choose
 $tokens = @{}
 $tokens.Add('acl_tpl', 'c:\tokens\token_tpl.txt')
@@ -149,6 +182,12 @@ deployToken $tokens.aws_creds $admin_station_aws2
 deployToken $tokens.keepass $jump_box
 deployToken $tokens.brocade_cfg $file_server
 
-## TODO
+# Remove tokens from remote systems
+removeToken $admin_station_aws1
+removeToken $admin_station_aws2
+removeToken $jump_box
+removeToken $file_server
+
+#TODO: 
 # Add ability to change file ownership to 
 # match file location if necessary
