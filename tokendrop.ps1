@@ -1,4 +1,4 @@
-function deployToken([string]$token_file, [hashtable]$endpoint) {
+function deployToken([hashtable]$endpoint) {
 <#
 .SYNOPSIS
 Deploys honey tokens to remote machines using WinRM
@@ -15,31 +15,32 @@ Path to the token file on the staging machine
 .PARAMETER endpoint
 Hashtable of computer hostnames as keys and an array of destination paths
 #>
-    # validate local file exists
-    Write-Host '[-] Validating local token'
-    if (! (Test-Path -Path $token_file)){
-        Write-Host "[-] Error: $token_file not found!"
-        return $false
-    }
     
     foreach ($computer in $endpoint.keys){
         Write-Host "[-] Connecting to remote host: $computer" -ForegroundColor Green
         $session = (New-PSSession -ComputerName $computer -Credential $auth)
         foreach ($dest_file in $endpoint.$computer){
             $dest_path = Split-Path -Path $dest_file
-            # check if remote file already exits
-            #Write-Host '[-] Checking remote file'
+            $token = Split-Path -Path $dest_file -Leaf
+            $token_file = "$token_path$token"
+
             if (! (Invoke-Command -ScriptBlock {
                  Test-Path -Path $using:dest_file } -Session $session)){
-                #Write-Host "[-] Remote file: $dest_file not present"
-                #Write-Host "[-] Checking path(s)"
+
                 #TODO: Add prompt if path does not exist
                 if (! (Invoke-Command -ScriptBlock {
                      Test-Path -Path $using:dest_path } -Session $session)){
-                 #   Write-Host "[-] Creating remote file path"
+
                     Invoke-Command -Command {
                          New-Item -ItemType Directory $using:dest_path
                     } -Session $session
+                }
+                # Check if token exists locally first
+                Write-Host '[-] Validating local token(s)'
+                if (! (Test-Path -Path $token_file)){
+                    Write-Host "[-] Error: $token_file not found! Skipping"
+                    #return $false
+                    continue
                 }
                 # Copy token to destination
                 Write-Host '[-] Dropping token:', $dest_file
@@ -47,7 +48,7 @@ Hashtable of computer hostnames as keys and an array of destination paths
                 # Set Audit ACL 
                 Write-Host '[-] Setting Audit ACL'
                 sleep 3
-                setTokenAcl $tokens.acl_tpl $session $dest_file
+                setTokenAcl $token_acl_tpl $session $dest_file
             } else {
                 Write-Host "[-] Token: $dest_file already exists on $computer"
             }
@@ -56,7 +57,6 @@ Hashtable of computer hostnames as keys and an array of destination paths
         Remove-PSSession $session
     }
 }
-
 
 function setTokenAcl(
 <#
@@ -67,8 +67,7 @@ License: BSD 3-Clause
 Required Dependencies: None
 Optional Dependencies: None
 .DESCRIPTION
-Deploys honey tokens to remote machines using hashtables for the each host
-or a specific token can be deployed to a group of hosts in a single hashtable.
+Sets Audit ACL on remote files
 All communicaton to remote hosts uses WinRM.
 .PARAMETER dest_file
 Path a local file that has been configured with the desired audit acl
@@ -124,7 +123,8 @@ function removeToken([hashtable]$remote_hosts){
                 break
             }
             # If we get here rm file
-            Write-Host '[-] Removing token'
+            # TODO: only prompt once for multiple files
+            Write-Host '[-] Removing token(s)'
             Invoke-Command -ScriptBlock { Remove-Item -Path $using:dest_file } -Session $session
 
         }
@@ -148,46 +148,29 @@ $banner = @'
 $banner
 # TODO: Add try/catch
 $auth = Get-Credential
-# $assets = @{}
-$jump_box = @{}
-$file_server = @{}
-$admin_station_aws1 = @{}
-$admin_station_aws2 = @{}
-# Hash values are lists of potential destinations
-
-$admin_station_aws1.Add('winblue1', @())
-$admin_station_aws2.Add('winblue1', @())
-$jump_box.Add('winblue2', @())
-$file_server.Add('winblue3', @())
-# Destinations for winblue1
-$admin_station_aws1.winblue1 += 'c:\users\marcus.jones.sa\.aws\config'
-$admin_station_aws2.winblue1 += 'c:\users\marcus.jones.sa\.aws\credentials'
-# Destination for winblue2
-$jump_box.winblue2 += 'c:\admin_tools\keepass\servers.kdbx'
-# Destination for winblue3
-$file_server.winblue3 += 'c:\backups\brocade_cfgs.zip'
-
+# Store token files here
+$token_path = 'c:\tokens\'
+$token_acl_tpl = "$token_path" + 'token_tpl.txt'
 # TODO: add option to read these from file
 # List of tokens to choose
-$tokens = @{}
-$tokens.Add('acl_tpl', 'c:\tokens\token_tpl.txt')
-$tokens.Add('keepass', 'c:\tokens\servers.kdbx' )
-$tokens.Add('brocade_cfg', 'c:\tokens\brocade_cfgs.zip')
-$tokens.Add('aws_cfg', 'c:\tokens\.aws\config')
-$tokens.Add('aws_creds', 'c:\tokens\.aws\credentials')
+$key_terrain =@{}
+# Hash values are lists of potential destinations
+# TODO: capture hosts via AD OU
+$key_terrain.Add('winblue1', @())
+$key_terrain.Add('winblue2', @())
+$key_terrain.Add('winblue3', @())
+# Destination on host to place tokens
+# Script will create directories automatically
+$key_terrain.winblue1 += 'c:\users\marcus.jones.sa\.aws\config'
+$key_terrain.winblue1 += 'c:\users\marcus.jones.sa\.aws\credentials'
+$key_terrain.winblue2 += 'c:\admin_tools\keepass\servers.kdbx'
+$key_terrain.winblue3 += 'c:\backups\brocade_cfgs.zip'
 
 # Main
-deployToken $tokens.aws_cfg $admin_station_aws1
-deployToken $tokens.aws_creds $admin_station_aws2
-deployToken $tokens.keepass $jump_box
-deployToken $tokens.brocade_cfg $file_server
+deployToken $key_terrain
+# -- Testing --
+#removeToken $key_terrain
 
-# Remove tokens from remote systems
-removeToken $admin_station_aws1
-removeToken $admin_station_aws2
-removeToken $jump_box
-removeToken $file_server
-
-#TODO: 
-# Add ability to change file ownership to 
+# TODO: 
+# Add feature to change file ownership to 
 # match file location if necessary
