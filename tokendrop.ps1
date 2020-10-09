@@ -1,5 +1,6 @@
 [cmdletbinding()]
 Param (
+    [Parameter(Mandatory = $false)][String] $Server = "192.168.28.2",
     [Parameter(Mandatory = $false)]
     [ValidateSet("DeployTokens", "RemoveTokens")][String] $Task = "DeployTokens"
 )
@@ -153,7 +154,25 @@ $banner = @'
 
 $banner
 # TODO: Add try/catch
-$auth = Get-Credential
+try
+{
+    $auth = Get-Credential -ErrorAction Stop
+} catch [System.Security.Authentication.AuthenticationException]{
+    Write-Error "Invalid Credentials."
+    return
+}
+
+Function ValidateCredentials {
+    try {
+        $userlist = $(Get-ADUser -Filter * -Server $Server -ErrorAction Stop -Credential $auth |
+                Select-Object -First 1)
+    } catch [System.Security.Authentication.AuthenticationException] {
+        Write-Host "Invalid Credentials"
+    }  catch [Microsoft.ActiveDirectory.Management.ADServerDownException] {
+        Write-Host "No route to Active Directory Server."
+    }
+    if (!($userlist)) { exit 1 }
+}
 # Store token files here
 $token_path = 'c:\users\mechanic\tokens\'
 $token_acl_tpl = "$token_path" + 'token_tpl.txt'
@@ -173,6 +192,7 @@ $key_terrain.bruce  += 'c:\backups\brocade_cfgs.zip'
 $key_terrain.yagami += 'c:\admin_tools\keepass\servers.kdbx'
 
 # Main
+ValidateCredentials
 switch ($Task){
     "DeployTokens" { deployToken $key_terrain }
     "RemoveTokens" { removeToken $key_terrain }
