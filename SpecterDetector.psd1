@@ -1,6 +1,6 @@
 @{
     # Script module file associated with this manifest.
-    ModuleToProcess = 'SpecterDector.psm1'
+    ModuleToProcess = 'SpecterDetector.psm1'
     
     ModuleVersion = '1.0.0'
 
@@ -17,7 +17,7 @@
     PowerShellVersion = '2.0'
 
     # Functions to export from this module
-    FunctionsToExport = @('Deploy-Token', 'Remove-Token', 'Set-TokenAcl')
+    FunctionsToExport = @('Install-Token', 'Remove-Token', 'Set-FileAuditAcl')
 
     # Private data to pass to the module loader
     PrivateData = @{
