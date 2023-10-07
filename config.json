@@ -1,0 +1,37 @@
+{
+    "Files": [
+      {
+        "SourcePath": "C:\\Users\\tankmek\\tokens\\priv8.txt",
+        "Destinations": [
+          {
+            "Computer": "FLWIN10WK00",
+            "DestinationPath": "C:\\Users\\naruto\\Documents\\"
+          },
+          {
+            "Computer": "FLWIN10WK01",
+            "DestinationPath": "C:\\Users\\spartan\\Documents\\"
+          }
+        ]
+      },
+      {
+        "SourcePath": "C:\\Users\\tankmek\\tokens\\keepass.kdbx",
+        "Destinations": [
+          {
+            "Computer": "FLWIN10WK00",
+            "DestinationPath": "C:\\Users\\naruto\\Desktop\\"
+          }
+        ]
+      },
+      {
+        "SourcePath": "C:\\Users\\tankmek\\tokens\\.aws",
+        "Destinations": [
+          {
+            "Computer": "FLWIN10WK01",
+            "DestinationPath": "C:\\Users\\spartan\\"
+          }
+        ]
+      }
+
+    ]
+  }
+  
