@@ -9,3 +9,28 @@
     /_/                                                                       
 
 ```
+
+
+## Description
+
+The SpecterDetector PowerShell module is a versatile tool designed for deploying honey tokens, detecting suspicious activities, and configuring security settings on both local and remote Windows systems. This module utilizes PowerShell Remoting (WinRM) for seamless remote management.
+
+
+## Features
+
+- Deploy honey tokens (decoys) to remote machines.
+- Configure audit settings on remote systems efficiently.
+- **File and Folder Auditing**: Easily enable file and folder auditing to track access.
+
+
+## Installation
+
+```powershell
+Install-Module -Name SpecterDetector -Scope CurrentUser
+```
+
+## Usage
+
+```powershell
+Install-Token -ConfigFile "C:\Path\To\Your\Config\config.json"
+```
